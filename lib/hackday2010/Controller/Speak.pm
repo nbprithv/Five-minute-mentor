@@ -2,6 +2,7 @@ package hackday2010::Controller::Speak;
 use Moose;
 use namespace::autoclean;
 use Data::Dumper;
+use WordNet::QueryData;
 BEGIN {extends 'Catalyst::Controller'; }
 
 =head1 NAME
@@ -33,7 +34,8 @@ sub text :Local {
 
 	my($self,$c) = @_;
 #	my $text = "We have endured the shock of and watching so many innocent lives ended in acts of unimaginable horror.";
-my $text = "What we couldn't be sure of then -- and what the terrorists never expected -- was that America would emerge stronger, with a renewed spirit of pride and patriotism.";
+#my $text = "What we couldn't be sure of then -- and what the terrorists never expected -- was that America would emerge stronger, with a renewed spirit of pride and patriotism.";
+	my $text = "The moment the second plane hit the second building -- when we knew it was a terrorist attack -- many felt that our lives would never be the same least many sometime once september times three.";
 	$c->stash->{text} = $text;
 	return $text;
 }
@@ -46,7 +48,7 @@ my $text = "What we couldn't be sure of then -- and what the terrorists never ex
 =cut
 sub pre :Local :Args{
 	my($self,$c) = @_;
-	$c->forward('/speak/text');
+#	$c->forward('/speak/text');
 	my $text = $c->stash->{text};
 	$c->forward('/search/get_pos',[$text]);
 	my $taggedstring = $c->stash->{getpos};
@@ -87,7 +89,7 @@ sub pre :Local :Args{
 =cut
 sub embed :Local :Args{
 	my($self,$c) = @_;
-	$c->forward('/speak/text');
+#	$c->forward('/speak/text');
 	my $text = $c->stash->{text};
 	my @textand = split('and',$text);
 	if(@textand>0){
@@ -121,6 +123,71 @@ sub embed :Local :Args{
 =cut
 sub milton :Local{
 	my($self,$c,@args) = @_;
+#	$c->forward('/speak/text');
+	my $text = $c->stash->{text};
+	$c->forward('/search/get_pos',[$text]);
+	my $taggedstring = $c->stash->{getpos};
+	my $normcount = 0;
+	my $return;
+	while($taggedstring =~ m#<nn*>(.*?)</nn*>#igms){
+		my $wn = WordNet::QueryData->new(dir=>'/home/niranjan/WordNet-3.0/dict/',verbose=>0,noload=>0);
+		#my $wnrs = [$wn->querySense('learning#n#1','domt')];
+		my $wnrs = [$wn->listAllWords('learning')];
+		$c->res->body('<pre>'.Dumper($wnrs).'</pre>');
+		$c->detach;
+	}
+
+	my $gernalization = ['always','everyone','anyone','someone','everything','never'];
+
+	my @textnorm = split(/\W/,$text);
+	my $gencount=0;
+	foreach my $textn (@textnorm){
+		$textn = lc($textn);
+		foreach my $gen (@$gernalization){
+			if($textn eq $gen){
+				$gencount++;	
+			}
+		}
+	}
+	$return->{gen} = $gencount;
+
+	my $refindex = ['more','most','like','as'];
+	my $refindexcount = 0;
+	foreach my $textn (@textnorm){
+		$textn = lc($textn);
+		foreach my $ref (@$refindex){
+			if($textn eq $ref){
+				$refindexcount++;	
+			}
+		}
+	}
+	$return->{refindex} = $refindexcount;
+	
+	my $timeindex = ['sometime','once','days','weeks','moment','anytime','times','presently'];	
+	my $timeindexcount = 0;
+	my $textncount=0;
+	foreach my $textn (@textnorm){
+		my $textn = lc($textn);
+		foreach my $ti (@$timeindex){
+			if($textn eq $ti){
+#				$c->res->body(Dumper($textnorm[$textncount-1]));
+				$c->forward('/search/get_pos',[$textnorm[$textncount-1]]);
+				my $taggedstring = $c->stash->{getpos};
+				$taggedstring =~ m#<cd*>(.*?)</cd*>#ims;
+				if(!$1){
+					$timeindexcount++;	
+				}
+			}
+		}
+		$textncount++;
+	}
+	$return->{timeindex} = $timeindexcount;
+	my $total = $gencount+$refindexcount+$timeindexcount;
+	$c->stash->{milton} = $total;
+	if($total == 0){
+		$c->stash->{meta} = 1;
+		$c->forward('meta');
+	}
 	
 }
 
@@ -128,7 +195,35 @@ sub milton :Local{
 1. ++meta when milton is absent
 2. specific time
 =cut
-sub meta {
+sub meta :Local {
+	my($self,$c,@args) = @_;
+#	$c->forward('/speak/text');
+	my $text = $c->stash->{text};
+	my @textnorm = split(/\W/,$text);
+	#$c->forward('/search/get_pos',[$text]);
+	#my $taggedstring = $c->stash->{getpos};
+
+
+	my $timeindex = ['month','months','day','days','week','weeks','year','years','january','february','march','april','may','june','july','august','september','october','november','december'];	
+	my $timeindexcount = 0;
+	my $textncount=0;
+	foreach my $textn (@textnorm){
+		my $textn = lc($textn);
+		foreach my $ti (@$timeindex){
+			if($textn eq $ti){
+#				$c->res->body(Dumper($textnorm[$textncount-1]));
+				$c->forward('/search/get_pos',[$textnorm[$textncount-1]]);
+				my $taggedstring = $c->stash->{getpos};
+				$taggedstring =~ m#<cd*>(.*?)</cd*>#ims;
+				if($1){
+					$timeindexcount++;	
+				}
+			}
+		}
+		$textncount++;
+	}
+	$c->stash->{meta} += $timeindexcount;
+
 }
 
 =head2 repsys
