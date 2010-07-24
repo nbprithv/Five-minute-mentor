@@ -64,7 +64,7 @@ sub parse_search :Local :Args {
     my ($self,$c,$search_string) = @_;
 #    my $search_string = shift;
     my $verb;
-    my @noun;
+    my $noun;
     my $to=0;
     my $taggedstring = $c->forward('get_pos',[$search_string]);
 
@@ -72,7 +72,7 @@ sub parse_search :Local :Args {
     $taggedstring =~ m#<vbs*>(.*?)</vbs*>#ims;
     $verb = $1;
     while($taggedstring =~ m#<nns*>(.*?)</nns*>#imsg)
-      { push (@noun,$1);
+      { push (@$noun,$1);
       }
 
     #print $taggedstring;
@@ -87,8 +87,10 @@ sub parse_search :Local :Args {
       }
 
     #print $to;
-
-    return ($to,$verb,@noun);
+	$c->stash->{to} = $to;
+	$c->stash->{verb} = $verb;
+	$c->stash->{noun} = $noun;
+#    return ($to,$verb,@noun);
 
 }
 
@@ -134,8 +136,8 @@ sub get_pos :Local :Args{
       my $p = new Lingua::EN::Tagger;
       my $tagged_text = $p->add_tags( $search_string );
 
-
-      return $tagged_text;
+	$c->stash->{getpos} = $tagged_text;
+#      return $tagged_text;
 
     }
 
@@ -152,6 +154,6 @@ it under the same terms as Perl itself.
 
 =cut
 
-__PACKAGE__->meta->make_immutable;
+#__PACKAGE__->meta->make_immutable;
 
 1;

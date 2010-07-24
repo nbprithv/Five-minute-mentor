@@ -53,7 +53,7 @@ Attempt to render a view, if needed.
 
 sub end : ActionClass('RenderView') {
 	    my ( $self, $c ) = @_;
-	$c->forward('View::TT');
+#	$c->forward('View::TT');
 }
 
 =head1 AUTHOR

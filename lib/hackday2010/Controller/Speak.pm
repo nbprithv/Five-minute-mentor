@@ -26,11 +26,12 @@ sub index :Path :Args(0) {
 
     $c->response->body('Matched hackday2010::Controller::Speak in Speak.');
 }
-
+our $text = "We have endured the shock of watching so many innocent lives ended in acts of unimaginable horror.";
 sub text :Local {
 
 	my($self,$c) = @_;
-	my $text = "We have endured the shock of watching so many innocent lives ended in acts of unimaginable horror.";
+	my $text = "We have endured the shock of and watching so many innocent lives ended in acts of unimaginable horror.";
+	$c->stash->{text} = $text;
 	return $text;
 }
 
@@ -51,10 +52,30 @@ sub pre :Local :Args{
 =cut
 sub embed :Local :Args{
 	my($self,$c) = @_;
-	my $text = $self->text;
-	my $parse = $c->forward('/search/parse_search',[$text]);
-	$c->res->body(Dumper($text));
-	$c->detach;
+	$c->forward('/speak/text');
+	my $text = $c->stash->{text};
+	my @textand = split('and',$text);
+	if(@textand>0){
+
+		$c->forward('/search/get_pos',[$text]);
+		my $taggedstring = $c->stash->{getpos};
+		my $presentverb=0;
+		while($taggedstring =~ m#<vbp*>(.*?)</vbp*>#igms){
+			$presentverb++;
+		}
+		$c->stash->{embed} = $presentverb;
+		$c->res->body('<pre>aaaaaaaaa'.Dumper($presentverb).'</pre>');
+#		$c->stash->{embed} = 
+	}
+	else{
+		$c->stash->{embed} = 0;
+	}
+
+	#$c->forward('/search/parse_search',[$text]);
+#	my $to = $c->stash->{to};
+#	my $verb = $c->stash->{verb};
+#	my $noun = $c->stash->{noun};
+#	$c->detach;
 }
 
 =head2 milton
