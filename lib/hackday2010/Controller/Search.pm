@@ -1,6 +1,6 @@
 package hackday2010::Controller::Search;
 use Moose;
-use namespace::autoclean;
+#use namespace::autoclean;
 use WWW::Mechanize;
 use JSON -support_by_pp;
 use Data::Dumper;
@@ -8,7 +8,7 @@ use Lingua::EN::Tagger;
 use WordNet::QueryData;
 use WordNet::Similarity::path;
 use URI::Escape;
-use CGI::Minimal;
+#use CGI::Minimal;
 
 
 BEGIN {extends 'Catalyst::Controller'; }
@@ -36,8 +36,7 @@ sub index :Path :Args(0) {
     $c->response->body('Matched hackday2010::Controller::Search in Search.');
 }
 
-sub find_similarity
-  {
+sub find_similarity :Local {
     my ($self,$c,$word) = @_;
 #    my ($word) = shift;
     my @availableverbs = ('listen' , 'read');
@@ -67,7 +66,7 @@ sub parse_search :Local :Args {
     my $verb;
     my @noun;
     my $to=0;
-    my $taggedstring = get_pos($search_string);
+    my $taggedstring = $c->forward('get_pos',[$search_string]);
 
 
     $taggedstring =~ m#<vbs*>(.*?)</vbs*>#ims;
@@ -128,6 +127,18 @@ sub get_representational_system :Local :Args{
       }
     }
 }
+
+sub get_pos :Local :Args{
+	my($self,$c,$search_string) = @_;
+#      my $search_string = shift;
+      my $p = new Lingua::EN::Tagger;
+      my $tagged_text = $p->add_tags( $search_string );
+
+
+      return $tagged_text;
+
+    }
+
 
 
 =head1 AUTHOR

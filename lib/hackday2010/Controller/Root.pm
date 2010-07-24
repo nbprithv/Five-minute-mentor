@@ -51,7 +51,10 @@ Attempt to render a view, if needed.
 
 =cut
 
-sub end : ActionClass('RenderView') {}
+sub end : ActionClass('RenderView') {
+	    my ( $self, $c ) = @_;
+	$c->forward('View::TT');
+}
 
 =head1 AUTHOR
 
