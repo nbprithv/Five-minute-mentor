@@ -23,14 +23,17 @@ Catalyst Controller.
 
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-
+    #my $acronnyms = get_acronyms();
+    #$c->response->body(Dumper($acronnyms));
+    #$c->detach;
     $c->response->body('Matched hackday2010::Controller::Speak in Speak.');
 }
 our $text = "We have endured the shock of watching so many innocent lives ended in acts of unimaginable horror.";
 sub text :Local {
 
 	my($self,$c) = @_;
-	my $text = "We have endured the shock of and watching so many innocent lives ended in acts of unimaginable horror.";
+#	my $text = "We have endured the shock of and watching so many innocent lives ended in acts of unimaginable horror.";
+my $text = "What we couldn't be sure of then -- and what the terrorists never expected -- was that America would emerge stronger, with a renewed spirit of pride and patriotism.";
 	$c->stash->{text} = $text;
 	return $text;
 }
@@ -43,8 +46,40 @@ sub text :Local {
 =cut
 sub pre :Local :Args{
 	my($self,$c) = @_;
-	my $text = $c->forward('text');
-	
+	$c->forward('/speak/text');
+	my $text = $c->stash->{text};
+	$c->forward('/search/get_pos',[$text]);
+	my $taggedstring = $c->stash->{getpos};
+	my $precount = 0;
+	while($taggedstring =~ m#<jjr>(.*?)</jjr>#igms){
+		$precount++;
+	}
+
+	my @textwhat = split(/what/i,$text);
+	foreach my $textw (@textwhat){
+		$c->forward('/search/get_pos',[$textw]);
+		my $taggedstring = $c->stash->{getpos};
+		while($taggedstring =~ m#<jj>(.*?)</jj>#igms){
+			$precount++;
+		}
+		
+	}
+	my @texthow = split(/how/i,$text);
+	foreach my $textw (@texthow){
+		$c->forward('/search/get_pos',[$textw]);
+		my $taggedstring = $c->stash->{getpos};
+		while($taggedstring =~ m#<rb>(.*?)</rb>#igms){
+			$precount++;
+		}
+		
+	}
+	my @texttry = split(/try/i,$text);
+	if(@texttry > 1){
+		$precount++;
+	}
+#	$c->res->body('<pre>aaaaaaaaa'.Dumper($precount).'</pre>');
+
+	$c->stash->{pre} = $precount;
 }
 
 =head2 embed
@@ -64,7 +99,7 @@ sub embed :Local :Args{
 			$presentverb++;
 		}
 		$c->stash->{embed} = $presentverb;
-		$c->res->body('<pre>aaaaaaaaa'.Dumper($presentverb).'</pre>');
+	#	$c->res->body('<pre>aaaaaaaaa'.Dumper($presentverb).'</pre>');
 #		$c->stash->{embed} = 
 	}
 	else{
@@ -84,7 +119,9 @@ sub embed :Local :Args{
 3. lack of referential index - (many,most,most,like...)
 4. lack of time index (sometime,once,[months,days,weeks,moment,anytime,times,presently] without a number before it) 
 =cut
-sub milton {
+sub milton :Local{
+	my($self,$c,@args) = @_;
+	
 }
 
 =head2 meta
