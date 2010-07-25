@@ -25,154 +25,142 @@ Catalyst Controller.
 
 sub index :Path :Args(0) {
 
-    my ( $self, $c ) = @_;
-    my $speech = $c->request->params("speech");
-    my @lines = split('.',$speech);
-    my $groupcount = 1;
-    my $linecount = 1;
-    my $finaloutput = {};
-    my $repsys = {};
-    my $output = {};
+  my ( $self, $c ) = @_;
+  my $speech = $c->request->param("speech");
+  if (!$speech) {
     
-    
-    for(my i=0;i<@lines;i++)
-      {
-
-	# start for checking next lines starting with And
-	my $aheadcheck = 1;
-	my $line = $lines[$i];
-    
-	my $aheadcount = 0;
-	while($aheadcheck)
-	  {
-	    my $nextline = $lines[$i+$aheadcount+1];
-	    my @nextwords = split(' ',$nextline);
-	    if($nextwords[0] =~ m#and#i)
-	      {
-		$line .= ' ' . $nextline;
-	      }
-	    else
-	      {
-		$aheadcheck = 0;
-	      }
-	    
-	  }
-	$i = $i + $aheadcount;
-	# end of checking for next lines starting with And
-	
-	$output->{linecount}->{text} = $line;
-	$c->forward('pre');
-
-	$output->{$linecount}->{pre} = $c->stash->{pre};
-	$c->forward('embed');
-	$output->{$linecount}->{embed} = $c->stash->{embed};
-	$c->forward('milton');
-
-	$output->{$linecount}->{milton} = $c->stash->{milton};
-
-	# Meta if there is no milton model
-	if($output->{$linecount}->{milton} == 0 )
-	  {
-	    $output->{$linecount}->{meta}==1;
-	  }
-
-	$c->forward('meta');
-
-	$output->{$linecount}->{meta} += $c->stash->{repsys};
-
-
-	$c->forward('repsys');
-	$output->{$linecount}->{repsys} = $c->stash->{repsys};
-	$c->forward('pre');
-	$output->{$linecount}->{modop} = $c->stash->{modop};
-
-
-	# Add to Group Meta and Group Milton
-	$finaloutput->{$groupcount}->{meta} += $output->{$linecount}->{meta};
-	$finaloutput->{$groupcount}->{milton} += $output->{$linecount}->{milton};
-		
-	if($linecount >= 5)
-	  {
-	    
-	    #Check if we can reset group
-	    if($finaloutput->{$groupcount}->{meta} == $finaloutput->{$groupcount}->{milton})
-	      {
-
-		$linecount++;		
-	      }
-	    else
-	      {
-
-		$linecount = 1;
-		# Calculate Score
-		foreach my $linekey( keys %{$output})
-		  {
-
-		    #pre supposition
-		    if($finaloutput->{$groupcount}-->{milton} > $finaloutput->{groupcount}->{meta}  )
-		      {
-			if($output->{$linekey}->{pre} > 0)
-			  {
-			    $finaloutput->{$groupcount}->{score} += 1;
-			  }
-			else
-			  {
-			    $finaloutput->{$groupcount}->{score} -= 1;
-			  }
-			}
-		    else
-		      {
-			if($output->{$linekey}->{meta} <= 0)
-			  {
-			    $finaloutput->{$groupcount}->{score} += 1;
-			  }
-			else
-			  {
-			    $finaloutput->{$groupcount}->{score} -= 1;
-			  }
-		      }
-		    
-		    if($finaloutput->{$groupcount}-->{milton} > $finaloutput->{groupcount}->{meta}  )
-		      {
-			if($output->{$linekey}->{embed} > 0)
-			  {
-			    $finaloutput->{$groupcount}->{score} += 1;
-			  }
-			else
-			  {
-			    $finaloutput->{$groupcount}->{score} -= 1;
-			  }
-		      }
-		    else
-		      {
-			if($output->{$linekey}->{embed} <= 0)
-			  {
-			    $finaloutput->{$groupcount}->{score} += 1;
-			  }
-			else
-			  {
-			    $finaloutput->{$groupcount}->{score} -= 1;
-			  }
-		      }
-		  }
-		
-
-		# Append the information to the group
-		$finaloutput->{$groupcount}->{lines} = $output;
-		$output = {};
-
-		$groupcount++;
-		
-
-	      }
-	    
-	    
-	
-	
-	  }
-	
-      }
+    $c->forward('View::TT');
+    $c->detach;
   }
+  chomp($speech);
+  
+  my @lines = split(/\.|\?|\!/m,$speech);
+  my $groupcount = 0;
+  my $linecount = 0;
+  my $finaloutput = [];
+  my $repsys = {};
+  my $output = [];
+  for (my $i=0;$i<@lines;$i++) {
+    # start for checking next lines starting with And
+    my $aheadcheck = 1;
+    my $line = $lines[$i];
+    
+    my $aheadcount = 0;
+    while ($aheadcheck) {
+      my $nextline = $lines[$i+$aheadcount+1];
+      my @nextwords = split(' ',$nextline);
+      if ($nextwords[0] =~ m#and#i) {
+	$line = $line + ' ' + $nextline;
+	$aheadcount++;
+		
+      } else {
+	$aheadcheck = 0;
+      }
+	    
+    }
+    $i = $i + $aheadcount;
+    # end of checking for next lines starting with And
+    $c->stash->{text} = $line;
+    $output->[$linecount] = {};
+    $output->[$linecount]->{text} = $line;
+    $c->forward('pre');
+
+    $output->[$linecount]->{pre} = $c->stash->{pre};
+    $c->forward('embed');
+    $output->[$linecount]->{embed} = $c->stash->{embed};
+    $c->forward('milton');
+
+    $output->[$linecount]->{milton} = $c->stash->{milton};
+
+    # Meta if there is no milton model
+    if (!$output->[$linecount]->{milton} ) {
+    $output->[$linecount]->{meta}=1;
+    }
+
+    $c->log->debug("Meta is " + $c->stash->{meta});
+	
+
+    $c->forward('meta');
+    if ( !$output->[$linecount]->{meta}) {
+	    
+      $output->[$linecount]->{meta} = $c->stash->{meta};
+    }
+	
+
+    #	$c->forward('repsys');
+    #	$output->[$linecount]->{repsys} = $c->stash->{repsys};
+    #	$c->forward('pre');
+    #	$output->[$linecount]->{modop} = $c->stash->{modop};
+
+    # Add to Group Meta and Group Milton
+    $finaloutput->[$groupcount]->{meta} += $output->[$linecount]->{meta};
+    $finaloutput->[$groupcount]->{milton} += $output->[$linecount]->{milton};
+    $linecount++;		
+    if ($linecount >= 5 ||  $i==@lines-1) {
+		    
+      #Check if we can reset group
+      if ($finaloutput->[$groupcount]->{meta} != $finaloutput->[$groupcount]->{milton} ||  $i==@lines-1) {
+	# Calculate Score
+	my $linekey = 0;
+	$finaloutput->[$groupcount]->{score} = 0;
+	
+	foreach ( @{$output}) {
+
+	  #pre supposition
+	  if ($finaloutput->[$groupcount]->{milton} > $finaloutput->[$groupcount]->{meta}  ) {
+	    if ($output->[$linekey]->{pre} > 0) {
+	      $finaloutput->[$groupcount]->{score} += 1*$output->[$linekey]->{pre};
+	    } else {
+
+	      $finaloutput->[$groupcount]->{score} += -1*$output->[$linekey]->{pre};
+	    }
+	  } else {
+	    if ($output->[$linekey]->{pre} <= 0 || !$output->[$linekey]->{pre}) {
+	     # $finaloutput->[$groupcount]->{score} += 1;
+
+	    } else {
+
+	      $finaloutput->[$groupcount]->{score} -= 1;
+	    }
+	  }
+	
+	  #Embedded Commands
+	  if ($finaloutput->[$groupcount]->{milton} > $finaloutput->[$groupcount]->{meta}  ) {
+	    if ($output->[$linekey]->{embed} > 0) {
+	      $finaloutput->[$groupcount]->{score} += 1*$output->[$linekey]->{embed};
+	    } else {
+	      $finaloutput->[$groupcount]->{score} += -1*$output->[$linekey]->{embed};
+
+	    }
+	  } else {
+	    if ($output->[$linekey]->{embed} || !$output->[$linekey]->{embed}) {
+	     # $finaloutput->[$groupcount]->{score} += 1;
+
+	    } else {
+	      $finaloutput->[$groupcount]->{score} -= 1;
+	    }
+	  }
+	  $linekey++;
+	}
+
+	# Append the information to the group
+	$finaloutput->[$groupcount]->{lines} = $output;
+	$output = [];
+	$groupcount++;
+	$linecount = 0;
+
+      }
+    }
+  }
+  
+  
+  $c->log->info(Dumper($finaloutput));
+    
+  $c->stash->{results} = $finaloutput;
+  $c->stash->{template} = "speak/results.tt";
+  $c->forward('View::TT');
+    
+}
 
 
 
@@ -182,12 +170,12 @@ our $text = "We have endured the shock of watching so many innocent lives ended 
 
 sub text :Local {
 
-	my($self,$c) = @_;
-#	my $text = "We have endured the shock of and watching so many innocent lives ended in acts of unimaginable horror.";
-#my $text = "What we couldn't be sure of then -- and what the terrorists never expected -- was that America would emerge stronger, with a renewed spirit of pride and patriotism.";
-	my $text = "The moment the second plane hit the second building -- when we knew it was a terrorist attack -- many felt that our lives would never be the same least many sometime once september times three.";
-	$c->stash->{text} = $text;
-	return $text;
+  my($self,$c) = @_;
+  #	my $text = "We have endured the shock of and watching so many innocent lives ended in acts of unimaginable horror.";
+  #my $text = "What we couldn't be sure of then -- and what the terrorists never expected -- was that America would emerge stronger, with a renewed spirit of pride and patriotism.";
+  my $text = "The moment the second plane hit the second building -- when we knew it was a terrorist attack -- many felt that our lives would never be the same least many sometime once september times three.";
+  $c->stash->{text} = $text;
+  return $text;
 }
 
 =head2 pre
@@ -201,7 +189,7 @@ sub text :Local {
 
 sub pre :Local :Args{
 	my($self,$c) = @_;
-#	$c->forward('/speak/text');
+	#$c->forward('/speak/text');
 	my $text = $c->stash->{text};
 	$c->forward('/search/get_pos',[$text]);
 	my $taggedstring = $c->stash->{getpos};
@@ -211,6 +199,7 @@ sub pre :Local :Args{
 	}
 
 	my @textwhat = split(/what/i,$text);
+	if($textwhat[1]){
 	foreach my $textw (@textwhat){
 		$c->forward('/search/get_pos',[$textw]);
 		my $taggedstring = $c->stash->{getpos};
@@ -218,8 +207,9 @@ sub pre :Local :Args{
 			$precount++;
 		}
 		
-	}
+	}}
 	my @texthow = split(/how/i,$text);
+	if($texthow[1]){
 	foreach my $textw (@texthow){
 		$c->forward('/search/get_pos',[$textw]);
 		my $taggedstring = $c->stash->{getpos};
@@ -227,30 +217,27 @@ sub pre :Local :Args{
 			$precount++;
 		}
 		
-	}
+	}}
 	my @texttry = split(/try/i,$text);
 	if(@texttry > 1){
 		$precount++;
 	}
-#	$c->res->body('<pre>aaaaaaaaa'.Dumper($precount).'</pre>');
-
+	#$c->res->body('<pre>aaaaaaaaa'.Dumper($precount).'</pre>');
 	$c->stash->{pre} = $precount;
 }
 
 =head2 embed
-
 1. conjunction (and) + simple present verb
-
 =cut
-
 sub embed :Local :Args{
 	my($self,$c) = @_;
 #	$c->forward('/speak/text');
 	my $text = $c->stash->{text};
 	my @textand = split('and',$text);
-	if(@textand>0){
+	my $presentverb;
+	if($textand[1]){
 
-		$c->forward('/search/get_pos',[$text]);
+		$c->forward('/search/get_pos',[$textand[1]]);
 		my $taggedstring = $c->stash->{getpos};
 		my $presentverb=0;
 		while($taggedstring =~ m#<vbp*>(.*?)</vbp*>#igms){
@@ -268,18 +255,16 @@ sub embed :Local :Args{
 #	my $to = $c->stash->{to};
 #	my $verb = $c->stash->{verb};
 #	my $noun = $c->stash->{noun};
+#	$c->res->body(Dumper($c->stash->{embed}));
 #	$c->detach;
 }
 
 =head2 milton
-
 1. nominalization - event_word or noun + verb of noun should exist + "an ongoing noun" should not make sense
 2. generalization - universal quantifier (always,everyone,anyone,someone,everything,never,always...)
 3. lack of referential index - (many,most,most,like...)
 4. lack of time index (sometime,once,[months,days,weeks,moment,anytime,times,presently] without a number before it) 
-
 =cut
-
 sub milton :Local{
 	my($self,$c,@args) = @_;
 #	$c->forward('/speak/text');
@@ -312,7 +297,7 @@ my $url="http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20html%20w
 	}
 	$return->{norm} = $normcount;
 
-	my $gernalization = ['always','everyone','anyone','someone','everything','never'];
+	my $gernalization = ['always','everyone','anyone','someone','everything','never','ever'];
 
 	my @textnorm = split(/\W/,$text);
 	my $gencount=0;
@@ -359,20 +344,18 @@ my $url="http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20html%20w
 	$return->{timeindex} = $timeindexcount;
 	my $total = $gencount+$refindexcount+$timeindexcount;
 	$c->stash->{milton} = $total;
+	$c->stash->{meta} = 0;
 	if($total == 0){
 		$c->stash->{meta} = 1;
-		$c->forward('meta');
+#		$c->forward('meta');
 	}
 	
 }
 
 =head2 meta
-
 1. ++meta when milton is absent
 2. specific time
-
 =cut
-
 sub meta :Local {
 	my($self,$c,@args) = @_;
 #	$c->forward('/speak/text');
@@ -400,7 +383,9 @@ sub meta :Local {
 		}
 		$textncount++;
 	}
-	$c->stash->{meta} += $timeindexcount;
+	$c->stash->{meta} = $timeindexcount;
+#	$c->res->body(Dumper($c->stash->{meta}));
+#	$c->detach;
 
 }
 
@@ -438,28 +423,76 @@ sub execute_curl_post : Local : Args(2){
 
 
 =head2 repsys
-
 1. verb or adverb is related to the see
 2. verb or adverb is related to hear
 3. verb or adverb is related to feel
 4. absence of any of above is auditor/digital
-
 =cut
-
-sub repsys {
+sub repsys :Local :Args {
+	my($self,$c,@args) = @_;
+	#$c->forward('/speak/text');
+	my $text = $c->stash->{text};
+	$c->forward('/search/get_pos',[$text]);
+	my $taggedstring = $c->stash->{getpos};
+	my $normcount = 0;
+	my $return;
+	while($taggedstring =~ m#<rb*>(.*?)</rb*>#igms){
+		$c->forward('/search/find_similarity',[$1]);
+		my $hash = $c->stash->{find_simlarity};
+	#	$c->res->body(Dumper($hash));	
+	#$c->detach;
+	}
+	while($taggedstring =~ m#<vb*>(.*?)</vb*>#igms){
+		$c->forward('/search/find_similarity',[$1]);
+		my $hash = $c->stash->{find_simlarity};
+	}
 }
 
 =head2 modop
-
 1. strong - when,do,are,am,i'm,will,just followed by a verb
 2. weak -should,would,may,can followed by a verb
 3. negative - but
-
 =cut
-
-sub modop {
+sub modop :Local :Args {
+	my($self,$c,@args) = @_;
+	#$c->forward('/speak/text');
+	my $text = $c->stash->{text};
+	my @textnorm = split(/\W/,$text);
+	my $medop = ['should','would','may','can'];
+	my $strongop = ['when','do','are','am',"m",'will'];
+	my $return;
+	my $textncount=0;
+	foreach my $textn (@textnorm){
+		$textn = lc($textn);
+		if($textn eq 'but'){
+			$return->{neg_modop}++;
+		}
+		foreach my $medo (@$medop){
+			if($textn eq $medo){
+				$c->forward('/search/get_pos',[$textnorm[$textncount+1]]);
+				my $taggedstring = $c->stash->{getpos};
+				$taggedstring =~ m#<vb*>(.*?)</vb*>#ims;
+				if($1){
+					$return->{med_modop}++;	
+				}
+			}
+		}
+		foreach my $strongo (@$strongop){
+			if($textn eq $strongo){
+				$c->forward('/search/get_pos',[$textnorm[$textncount+1]]);
+				my $taggedstring = $c->stash->{getpos};
+				$taggedstring =~ m#<vb*>(.*?)</vb*>#ims;
+				if($1){
+					$return->{strong_modop}++;	
+				}
+			}
+		}
+		$textncount++;
+	}
+#	$c->res->body(Dumper($return));
+#	$c->detach;
+	$c->stash->{modop} = $return;
 }
-
 =head1 AUTHOR
 
 niranjan,,,
