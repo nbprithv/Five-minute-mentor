@@ -141,6 +141,20 @@ sub get_pos :Local :Args{
 
     }
 
+sub get_jason_data :Local :Args {
+	my($self,$c,$json_url) = @_;
+#      my $json_url = shift;
+
+    my $browser = WWW::Mechanize->new();
+    $browser->get( $json_url );
+    my $content = $browser->content();
+    my $json = new JSON;
+    my $json_data =  $json->decode($content);#$json->allow_nonref->utf8->relaxed->escape_slash->loose->allow_singlequote->allow_barekey->decode($content);
+	$c->stash->{jsondata} = $json_data;
+#    return $json_data;
+    }
+
+
 
 
 =head1 AUTHOR

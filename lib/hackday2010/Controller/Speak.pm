@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Data::Dumper;
 use WordNet::QueryData;
+use WWW::Curl::Easy;
 BEGIN {extends 'Catalyst::Controller'; }
 
 =head1 NAME
@@ -123,19 +124,35 @@ sub embed :Local :Args{
 =cut
 sub milton :Local{
 	my($self,$c,@args) = @_;
-#	$c->forward('/speak/text');
+	$c->forward('/speak/text');
 	my $text = $c->stash->{text};
 	$c->forward('/search/get_pos',[$text]);
 	my $taggedstring = $c->stash->{getpos};
 	my $normcount = 0;
 	my $return;
 	while($taggedstring =~ m#<nn*>(.*?)</nn*>#igms){
-		my $wn = WordNet::QueryData->new(dir=>'/home/niranjan/WordNet-3.0/dict/',verbose=>0,noload=>0);
-		#my $wnrs = [$wn->querySense('learning#n#1','domt')];
-		my $wnrs = [$wn->listAllWords('learning')];
-		$c->res->body('<pre>'.Dumper($wnrs).'</pre>');
-		$c->detach;
+#		my $wn = WordNet::QueryData->new(dir=>'/home/niranjan/WordNet-3.0/dict/',verbose=>0,noload=>0);
+#		#my $wnrs = [$wn->querySense('learning#n#1','domt')];
+#		my $wnrs = [$wn->listAllWords('learning')];
+		
+my $url="http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20html%20where%20url%3D%22http%3A%2F%2Fwordnetweb.princeton.edu%2Fperl%2Fwebwn%3Fs%3D$1%22%20and%20xpath%3D%27%2F%2Fa[%40class%3D%22pos%22]%20%27%20and%20content%20%3D%20%27%28v%29%27&format=json&callback=";
+
+		$c->forward('/search/get_jason_data',[$url]);
+		my $json = $c->stash->{jsondata};
+		if($json->{results}){
+
+			my $googleurl = "http://ajax.googleapis.com/ajax/services/search/web?v=1.0&q=\"ongoing%20decision\"";
+			$c->forward('/search/get_jason_data',[$googleurl]);
+			my $googlejson = $c->stash->{jsondata};
+			my $resultcount = $googlejson->{responseData}->{cursor}->{estimatedResultCount};
+			if($resultcount > 2000){
+				$normcount++;
+#				$c->res->body($1.'<pre>'.Dumper($resultcount).'</pre>');
+#				$c->detach;
+			}
+		}
 	}
+	$return->{norm} = $normcount;
 
 	my $gernalization = ['always','everyone','anyone','someone','everything','never'];
 
@@ -225,6 +242,39 @@ sub meta :Local {
 	$c->stash->{meta} += $timeindexcount;
 
 }
+
+sub execute_curl_post : Local : Args(2){
+        my($self,$c,@args)=@_;
+        my $URL=$args[0];
+        my $postdata=$args[1];
+        my $curl = new WWW::Curl::Easy;
+
+        $curl->setopt(CURLOPT_HEADER,0);
+        $curl->setopt(CURLOPT_URL, $URL);
+        $curl->setopt(CURLOPT_POST,1);
+        $curl->setopt(CURLOPT_POSTFIELDS, $postdata);
+        my $response_body;
+
+
+        open (my $fileb, ">", \$response_body);
+        $curl->setopt(CURLOPT_WRITEDATA,$fileb);
+
+        # Starts the actual request
+        my $retcode = $curl->perform;
+
+    # Looking at the results...
+    if ($retcode == 0) {
+                        #print("Transfer went ok\n");
+                        my $response_code = $curl->getinfo(CURLINFO_HTTP_CODE);
+                        # judge result and next action based on $response_code
+                        return $response_body;
+#                print("Received response: $response_body\n");
+        } else {
+                return 'error';
+#                print("An error happened: ".$curl->strerror($retcode)." ($retcode)\n");
+        }
+}
+
 
 =head2 repsys
 1. verb or adverb is related to the see
