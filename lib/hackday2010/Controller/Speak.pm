@@ -124,7 +124,7 @@ sub embed :Local :Args{
 =cut
 sub milton :Local{
 	my($self,$c,@args) = @_;
-	$c->forward('/speak/text');
+#	$c->forward('/speak/text');
 	my $text = $c->stash->{text};
 	$c->forward('/search/get_pos',[$text]);
 	my $taggedstring = $c->stash->{getpos};
