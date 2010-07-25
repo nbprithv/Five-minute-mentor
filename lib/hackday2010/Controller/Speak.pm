@@ -24,13 +24,162 @@ Catalyst Controller.
 =cut
 
 sub index :Path :Args(0) {
+
     my ( $self, $c ) = @_;
-    #my $acronnyms = get_acronyms();
-    #$c->response->body(Dumper($acronnyms));
-    #$c->detach;
-    $c->response->body('Matched hackday2010::Controller::Speak in Speak.');
-}
+    my $speech = $c->request->params("speech");
+    my @lines = split('.',$speech);
+    my $groupcount = 1;
+    my $linecount = 1;
+    my $finaloutput = {};
+    my $repsys = {};
+    my $output = {};
+    
+    
+    for(my i=0;i<@lines;i++)
+      {
+
+	# start for checking next lines starting with And
+	my $aheadcheck = 1;
+	my $line = $lines[$i];
+    
+	my $aheadcount = 0;
+	while($aheadcheck)
+	  {
+	    my $nextline = $lines[$i+$aheadcount+1];
+	    my @nextwords = split(' ',$nextline);
+	    if($nextwords[0] =~ m#and#i)
+	      {
+		$line .= ' ' . $nextline;
+	      }
+	    else
+	      {
+		$aheadcheck = 0;
+	      }
+	    
+	  }
+	$i = $i + $aheadcount;
+	# end of checking for next lines starting with And
+	
+	$output->{linecount}->{text} = $line;
+	$c->forward('pre');
+
+	$output->{$linecount}->{pre} = $c->stash->{pre};
+	$c->forward('embed');
+	$output->{$linecount}->{embed} = $c->stash->{embed};
+	$c->forward('milton');
+
+	$output->{$linecount}->{milton} = $c->stash->{milton};
+
+	# Meta if there is no milton model
+	if($output->{$linecount}->{milton} == 0 )
+	  {
+	    $output->{$linecount}->{meta}==1;
+	  }
+
+	$c->forward('meta');
+
+	$output->{$linecount}->{meta} += $c->stash->{repsys};
+
+
+	$c->forward('repsys');
+	$output->{$linecount}->{repsys} = $c->stash->{repsys};
+	$c->forward('pre');
+	$output->{$linecount}->{modop} = $c->stash->{modop};
+
+
+	# Add to Group Meta and Group Milton
+	$finaloutput->{$groupcount}->{meta} += $output->{$linecount}->{meta};
+	$finaloutput->{$groupcount}->{milton} += $output->{$linecount}->{milton};
+		
+	if($linecount >= 5)
+	  {
+	    
+	    #Check if we can reset group
+	    if($finaloutput->{$groupcount}->{meta} == $finaloutput->{$groupcount}->{milton})
+	      {
+
+		$linecount++;		
+	      }
+	    else
+	      {
+
+		$linecount = 1;
+		# Calculate Score
+		foreach my $linekey( keys %{$output})
+		  {
+
+		    #pre supposition
+		    if($finaloutput->{$groupcount}-->{milton} > $finaloutput->{groupcount}->{meta}  )
+		      {
+			if($output->{$linekey}->{pre} > 0)
+			  {
+			    $finaloutput->{$groupcount}->{score} += 1;
+			  }
+			else
+			  {
+			    $finaloutput->{$groupcount}->{score} -= 1;
+			  }
+			}
+		    else
+		      {
+			if($output->{$linekey}->{meta} <= 0)
+			  {
+			    $finaloutput->{$groupcount}->{score} += 1;
+			  }
+			else
+			  {
+			    $finaloutput->{$groupcount}->{score} -= 1;
+			  }
+		      }
+		    
+		    if($finaloutput->{$groupcount}-->{milton} > $finaloutput->{groupcount}->{meta}  )
+		      {
+			if($output->{$linekey}->{embed} > 0)
+			  {
+			    $finaloutput->{$groupcount}->{score} += 1;
+			  }
+			else
+			  {
+			    $finaloutput->{$groupcount}->{score} -= 1;
+			  }
+		      }
+		    else
+		      {
+			if($output->{$linekey}->{embed} <= 0)
+			  {
+			    $finaloutput->{$groupcount}->{score} += 1;
+			  }
+			else
+			  {
+			    $finaloutput->{$groupcount}->{score} -= 1;
+			  }
+		      }
+		  }
+		
+
+		# Append the information to the group
+		$finaloutput->{$groupcount}->{lines} = $output;
+		$output = {};
+
+		$groupcount++;
+		
+
+	      }
+	    
+	    
+	
+	
+	  }
+	
+      }
+  }
+
+
+
+
+
 our $text = "We have endured the shock of watching so many innocent lives ended in acts of unimaginable horror.";
+
 sub text :Local {
 
 	my($self,$c) = @_;
@@ -42,11 +191,14 @@ sub text :Local {
 }
 
 =head2 pre
+
 1. comparison
 2. what + adj
 3. how + adv
 4. try
+
 =cut
+
 sub pre :Local :Args{
 	my($self,$c) = @_;
 #	$c->forward('/speak/text');
@@ -86,8 +238,11 @@ sub pre :Local :Args{
 }
 
 =head2 embed
+
 1. conjunction (and) + simple present verb
+
 =cut
+
 sub embed :Local :Args{
 	my($self,$c) = @_;
 #	$c->forward('/speak/text');
@@ -117,11 +272,14 @@ sub embed :Local :Args{
 }
 
 =head2 milton
+
 1. nominalization - event_word or noun + verb of noun should exist + "an ongoing noun" should not make sense
 2. generalization - universal quantifier (always,everyone,anyone,someone,everything,never,always...)
 3. lack of referential index - (many,most,most,like...)
 4. lack of time index (sometime,once,[months,days,weeks,moment,anytime,times,presently] without a number before it) 
+
 =cut
+
 sub milton :Local{
 	my($self,$c,@args) = @_;
 #	$c->forward('/speak/text');
@@ -209,9 +367,12 @@ my $url="http://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20html%20w
 }
 
 =head2 meta
+
 1. ++meta when milton is absent
 2. specific time
+
 =cut
+
 sub meta :Local {
 	my($self,$c,@args) = @_;
 #	$c->forward('/speak/text');
@@ -277,21 +438,28 @@ sub execute_curl_post : Local : Args(2){
 
 
 =head2 repsys
+
 1. verb or adverb is related to the see
 2. verb or adverb is related to hear
 3. verb or adverb is related to feel
 4. absence of any of above is auditor/digital
+
 =cut
+
 sub repsys {
 }
 
 =head2 modop
+
 1. strong - when,do,are,am,i'm,will,just followed by a verb
 2. weak -should,would,may,can followed by a verb
 3. negative - but
+
 =cut
+
 sub modop {
 }
+
 =head1 AUTHOR
 
 niranjan,,,
